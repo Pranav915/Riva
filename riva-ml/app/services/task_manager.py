@@ -134,6 +134,9 @@ class TaskManager:
 
     def process_request(self, client, user_prompt):
         """Calls OpenAI API to update the user's schedule, context, and interact with the calendar."""
+        # TODO: Remove this fallback once Google Calendar integration is properly configured
+        return "Task scheduling and calendar features are coming soon! For now, I can help you track expenses or have a conversation."
+        
         messages = [ 
             {
                 "role": "system",

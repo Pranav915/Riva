@@ -2,7 +2,7 @@
 Database Module - MongoDB connection and collection references.
 """
 from motor.motor_asyncio import AsyncIOMotorClient
-from .UserModel import UserContextCache
+from models.user.user_model import UserContextCache
 import os
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
