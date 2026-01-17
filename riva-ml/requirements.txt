@@ -29,6 +29,7 @@ vosk==0.3.45
 
 # Data Processing
 pydantic==2.10.6
+email-validator==2.2.0
 python-dotenv==1.0.1
 numpy==2.2.3
 
