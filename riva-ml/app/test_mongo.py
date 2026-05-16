@@ -2,13 +2,14 @@ import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 from dotenv import load_dotenv
+import certifi
 
 load_dotenv()
 
 async def test_connection():
     uri = os.getenv("MONGO_URI")
     print(f"Connecting to: {uri}")
-    client = AsyncIOMotorClient(uri)
+    client = AsyncIOMotorClient(uri, tlsCAFile=certifi.where())
     try:
         # The ping command is cheap and does not require auth.
         await client.admin.command('ping')

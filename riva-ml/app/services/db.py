@@ -9,10 +9,13 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
 
+import certifi
+
 load_dotenv()
 
 # Initialize MongoDB Client
-client = AsyncIOMotorClient(os.getenv("MONGO_URI"))
+uri = os.getenv("MONGO_URI")
+client = AsyncIOMotorClient(uri, tlsCAFile=certifi.where())
 db = client["riva"]
 
 # ----------------------------
