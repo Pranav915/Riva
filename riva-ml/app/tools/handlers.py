@@ -7,14 +7,15 @@ from datetime import datetime as dt
 from bson import ObjectId
 
 from services.finance_query_service import FinanceQueryService
-from services.memory_service import MemoryService
+from services.persona.memory_service import MemoryService
 from services.calendar_service import CalendarService
 from services.todo_service import TodoService
 from services.schedule_context import ScheduleContext
 from services.budget_service import BudgetService
+from services.persona.episodic_context_service import EpisodicContextService
 
 BACKGROUND_TOOLS = {"add_transaction", "update_event", "delete_event", "add_todo", "complete_todo", "delete_todo",
-                    "update_expense", "delete_expense"}
+                    "update_expense", "delete_expense", "save_user_memory", "save_episodic_context"}
 
 ACK_MESSAGES = {
     "add_transaction": "recorded.",
@@ -26,6 +27,8 @@ ACK_MESSAGES = {
     "delete_todo":     "removed from your list.",
     "update_expense":  "updated.",
     "delete_expense":  "deleted.",
+    "save_user_memory":"noted.",
+    "save_episodic_context":"got it, I'll keep that in mind.",
 }
 
 def get_tool_handler(user_id: str, db_collections: Dict[str, Any]) -> Callable[[str, Dict[str, Any]], Any]:
@@ -37,6 +40,7 @@ def get_tool_handler(user_id: str, db_collections: Dict[str, Any]) -> Callable[[
     calendar_tokens_collection = db_collections["calendar_tokens"]
     todos_collection = db_collections["todos"]
     budgets_collection = db_collections["budgets"]
+    episodic_context_collection = db_collections.get("episodic_context")
 
     finance_query_service = FinanceQueryService(transactions_collection)
     memory_service  = MemoryService(user_memory_collection)
@@ -44,6 +48,7 @@ def get_tool_handler(user_id: str, db_collections: Dict[str, Any]) -> Callable[[
     todo_service = TodoService(todos_collection)
     schedule_context = ScheduleContext(calendar_service=calendar_service, todo_service=todo_service)
     budget_svc = BudgetService(budgets_collection, transactions_collection)
+    episodic_ctx_svc = EpisodicContextService(episodic_context_collection) if episodic_context_collection is not None else None
 
     async def _execute_tool(name: str, args: Dict[str, Any]) -> Dict:
         context = {"user_id": user_id}
@@ -352,6 +357,45 @@ def get_tool_handler(user_id: str, db_collections: Dict[str, Any]) -> Callable[[
             await budget_svc.set_category_budget(user_id, category, limit)
             print(f"[GEMINI_LIVE] set_budget {category}=₹{limit}")
             return {"status": "success", "category": category, "limit": limit}
+
+        elif name == "save_user_memory":
+            try:
+                from models.user.persona_models import MemoryType, MemorySource
+                mem_type_str = args.get("memory_type", "fact").upper()
+                # Default to FACT if invalid
+                mem_type = getattr(MemoryType, mem_type_str, MemoryType.FACT)
+                
+                await memory_service.upsert_memory(
+                    user_id=user_id,
+                    memory_type=mem_type,
+                    key=args.get("key"),
+                    value=args.get("value"),
+                    confidence=0.9, # Explicitly stated by user during live
+                    source=MemorySource.EXPLICIT
+                )
+                print(f"[GEMINI_LIVE][BG] save_user_memory: {mem_type.value} {args.get('key')} = {args.get('value')}")
+                return {"status": "success"}
+            except Exception as e:
+                print(f"[GEMINI_LIVE][BG] save_user_memory error: {e}")
+                return {"status": "error", "message": str(e)}
+
+        elif name == "save_episodic_context":
+            try:
+                if not episodic_ctx_svc:
+                    return {"status": "error", "message": "Episodic context service not available."}
+                
+                await episodic_ctx_svc.add_context(
+                    user_id=user_id,
+                    context_type=args.get("context_type", "general"),
+                    summary=args.get("summary", ""),
+                    importance=0.8,
+                    duration_days=int(args.get("duration_days", 7)),
+                )
+                print(f"[GEMINI_LIVE][BG] save_episodic_context: {args.get('context_type')} — {args.get('summary')}")
+                return {"status": "success"}
+            except Exception as e:
+                print(f"[GEMINI_LIVE][BG] save_episodic_context error: {e}")
+                return {"status": "error", "message": str(e)}
 
         elif name == "end_conversation":
             return {"status": "end_conversation"}
