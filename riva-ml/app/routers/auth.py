@@ -15,9 +15,10 @@ from services.auth_service import verify_firebase_token, create_or_update_user, 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # Constants
-GOOGLE_CLIENT_ID = os.getenv("client_id")
-GOOGLE_CLIENT_SECRET = os.getenv("client_secret")
-REDIRECT_URI = "https://riva-production.up.railway.app/auth/callback"
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_AUTH_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_AUTH_CLIENT_SECRET", "")
+REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI", "http://localhost:8000/auth/callback")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 
 # --- Pydantic Models ---
@@ -124,7 +125,7 @@ async def auth_callback(request: Request):
         upsert=True
     )
 
-    return RedirectResponse(url="http://192.168.1.16/home")
+    return RedirectResponse(url=f"{FRONTEND_URL}/home")
 
 
 # --- User Profile Router (separate prefix) ---
