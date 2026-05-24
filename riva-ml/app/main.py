@@ -7,6 +7,12 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import asyncio
+import os
+
+from services.gmail_service import GmailService
+from services.email_processor import EmailProcessor
+from services.db import gmail_tokens_collection
 
 # Load environment variables
 load_dotenv()
@@ -21,8 +27,48 @@ async def lifespan(app: FastAPI):
     # Initialize STT provider
     init_stt_provider()
     print("[OK] RIVA Backend ready")
+    # Background Gmail fetcher
+    gmail_fetch_enabled = os.getenv("GMAIL_FETCH_ENABLED", "true").lower() in ("1", "true", "yes")
+    interval_hours = float(os.getenv("GMAIL_FETCH_INTERVAL_HOURS", "4"))
+    max_per_run = int(os.getenv("GMAIL_FETCH_MAX_PER_RUN", "50"))
+    delay_between = float(os.getenv("GMAIL_FETCH_DELAY_BETWEEN", "0.5"))
+
+    bg_task = None
+    if gmail_fetch_enabled:
+        gmail_service = GmailService(gmail_tokens_collection, None)
+        email_processor = EmailProcessor(gmail_service)
+
+        async def _gmail_fetch_loop():
+            print("[GMAIL_FETCH] Background fetch loop started")
+            try:
+                while True:
+                    runs = 0
+                    cursor = gmail_tokens_collection.find({})
+                    async for doc in cursor:
+                        if runs >= max_per_run:
+                            break
+                        uid = doc.get("user_id")
+                        if not uid:
+                            continue
+                        try:
+                            print(f"[GMAIL_FETCH] Processing user {uid}")
+                            await email_processor.fetch_and_process(uid, max_messages=25)
+                        except Exception as e:
+                            print(f"[GMAIL_FETCH] Error for user {uid}: {e}")
+                        runs += 1
+                        await asyncio.sleep(delay_between)
+
+                    await asyncio.sleep(interval_hours * 3600)
+            except asyncio.CancelledError:
+                print("[GMAIL_FETCH] Background fetch loop cancelled")
+                return
+
+        bg_task = asyncio.create_task(_gmail_fetch_loop())
+
     yield
     print("[INFO] Shutting down RIVA Backend...")
+    if bg_task:
+        bg_task.cancel()
 
 # Create FastAPI app
 app = FastAPI(

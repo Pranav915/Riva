@@ -6,6 +6,8 @@ import { AudioRecorder } from './audioRecorder';
 import { CalendarTab } from './components/CalendarTab';
 import { FinanceTab } from './components/FinanceTab';
 import { TodoTab } from './components/TodoTab';
+import { MailsTab } from './components/MailsTab';
+import { OrdersTab } from './components/OrdersTab';
 import { PCMPlayer } from './utils/pcmPlayer';
 import './index.css';
 
@@ -19,7 +21,7 @@ const WS_URL = import.meta.env.VITE_WS_URL || 'ws://127.0.0.1:8000/stream';
 const GEMINI_WS_URL = import.meta.env.VITE_GEMINI_WS_URL || 'ws://127.0.0.1:8000/gemini-live';
 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
-type Tab = 'voice' | 'calendar' | 'tasks' | 'finance';
+type Tab = 'voice' | 'calendar' | 'tasks' | 'finance' | 'mails' | 'orders';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -426,6 +428,18 @@ function App() {
           >
             <Wallet size={18} /> Finance
           </button>
+          <button 
+            className={`tab-btn ${activeTab === 'mails' ? 'active' : ''}`} 
+            onClick={() => setActiveTab('mails')}
+          >
+            <MessageSquare size={18} /> Mails
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'orders' ? 'active' : ''}`} 
+            onClick={() => setActiveTab('orders')}
+          >
+            <Wallet size={18} /> Orders
+          </button>
         </div>
       )}
 
@@ -520,10 +534,13 @@ function App() {
             )}
 
             {activeTab === 'calendar' && <CalendarTab user={user} apiUrl={API_URL} />}
-
             {activeTab === 'tasks' && <TodoTab user={user} apiUrl={API_URL} />}
             
             {activeTab === 'finance' && <FinanceTab user={user} apiUrl={API_URL} />}
+
+            {activeTab === 'mails' && <MailsTab user={user} apiUrl={API_URL} />}
+
+            {activeTab === 'orders' && <OrdersTab user={user} apiUrl={API_URL} />}
           </>
         )}
       </main>

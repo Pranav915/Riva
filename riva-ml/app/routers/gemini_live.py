@@ -289,6 +289,16 @@ async def get_tools_and_handlers(user_id: str):
                         "properties": {},
                     },
                 },
+                {
+                    "name": "list_gmail_actions",
+                    "description": "List user's Gmail action-required emails and order breakdown.",
+                    "parameters": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "days": {"type": "NUMBER", "description": "Days window to consider (optional)"}
+                        },
+                    },
+                },
             ]
         }
     ]
@@ -601,6 +611,24 @@ async def get_tools_and_handlers(user_id: str):
                 return {"status": "error", "message": "Expense not found — check the ID."}
             print(f"[GEMINI_LIVE][BG] delete_expense {expense_id} done")
             return {"status": "success"}
+
+        elif name == "list_gmail_actions":
+            try:
+                # recent action-required emails
+                cursor = parsed_emails_collection.find({"user_id": user_id, "action_required": True}).sort("created_at", -1).limit(50)
+                actions = []
+                async for a in cursor:
+                    actions.append({"subject": a.get("subject"), "task": a.get("parsed_task"), "priority": a.get("priority")})
+
+                # orders breakdown
+                pipeline = [{"$match": {"user_id": user_id}}, {"$group": {"_id": "$order_status", "count": {"$sum": 1}}}]
+                agg = orders_collection.aggregate(pipeline)
+                stats = await agg.to_list(length=20)
+                breakdown = {s["_id"]: s["count"] for s in stats}
+
+                return {"status": "success", "actions_count": len(actions), "actions": actions, "orders_breakdown": breakdown}
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
 
         elif name == "get_budget_status":
             from services.budget_service import BudgetService
