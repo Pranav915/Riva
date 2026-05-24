@@ -99,3 +99,37 @@ async def list_orders(user_id: str = Query(...), status: Optional[str] = Query(N
         d["_id"] = str(d.get("_id"))
         results.append(d)
     return {"count": len(results), "orders": results}
+
+
+@router.get("/orders/summary")
+async def orders_summary(user_id: str = Query(...)):
+    pipeline = [
+        {"$match": {"user_id": user_id}},
+        {"$group": {"_id": "$order_status", "count": {"$sum": 1}}}
+    ]
+    cursor = orders_collection.aggregate(pipeline)
+    stats = await cursor.to_list(length=20)
+    summary = {s["_id"]: s["count"] for s in stats}
+    total = sum(summary.values())
+    return {"total": total, "breakdown": summary}
+
+
+@router.get("/assistant/summary")
+async def assistant_summary(user_id: str = Query(...)):
+    # Action emails
+    actions_cursor = parsed_emails_collection.find({"user_id": user_id, "action_required": True})
+    actions = []
+    async for a in actions_cursor:
+        actions.append({"subject": a.get("subject"), "task": a.get("parsed_task"), "priority": a.get("priority")})
+
+    # Orders summary
+    pipeline = [
+        {"$match": {"user_id": user_id}},
+        {"$group": {"_id": "$order_status", "count": {"$sum": 1}}}
+    ]
+    cursor = orders_collection.aggregate(pipeline)
+    stats = await cursor.to_list(length=20)
+    breakdown = {s["_id"]: s["count"] for s in stats}
+
+    summary_text = f"You have {len(actions)} action-required emails. Orders: {breakdown}."
+    return {"summary": summary_text, "actions": actions, "orders_breakdown": breakdown}
