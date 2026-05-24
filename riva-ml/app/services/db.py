@@ -30,9 +30,15 @@ action_log_collection = db["action_log"]            # Audit trail
 
 # Calendar System Collections
 calendar_tokens_collection = db["calendar_tokens"]   # Per-user Google OAuth tokens
+# Gmail System Collections
+gmail_tokens_collection = db["gmail_tokens"]          # Per-user Gmail OAuth tokens
+email_state_collection = db["email_state"]            # Tracks last_read_at, history_id per user
+parsed_emails_collection = db["parsed_emails"]        # Stores parsed email metadata and actions
 
 # To-Do System Collections
 todos_collection = db["todos"]                        # Date-wise to-do items
+# E-commerce Orders
+orders_collection = db["orders"]                      # Tracks e-commerce orders per user
 
 
 # ----------------------------
