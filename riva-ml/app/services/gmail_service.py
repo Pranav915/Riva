@@ -34,6 +34,24 @@ class GmailService:
         }
         return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
 
+    async def get_last_synced(self, user_id: str) -> Optional[str]:
+        if self.email_state_collection is None:
+            return None
+        doc = await self.email_state_collection.find_one({"user_id": user_id})
+        if not doc:
+            return None
+        # stored as ISO8601 string
+        return doc.get("last_synced")
+
+    async def update_last_synced(self, user_id: str, iso_ts: str):
+        if self.email_state_collection is None:
+            return
+        await self.email_state_collection.update_one(
+            {"user_id": user_id},
+            {"$set": {"last_synced": iso_ts, "updated_at": datetime.utcnow()}},
+            upsert=True,
+        )
+
     async def exchange_code(self, code: str, user_id: str, redirect_uri: str) -> bool:
         import httpx
 
@@ -170,19 +188,46 @@ class GmailService:
             print(f"[GMAIL] Request error: {e}")
             return None
 
-    async def list_messages_since(self, user_id: str, query: str = None, since_history_id: str = None, max_results: int = 50) -> List[Dict]:
-        """List message IDs since a history id or using Gmail query syntax."""
+    async def list_messages_since(self, user_id: str, query: str = None, since_iso: str = None, since_history_id: str = None, max_results: int = 50) -> List[Dict]:
+        """List message IDs using Gmail query syntax with optional last-synced time.
+
+        Automatically filters out promotions, forums and social by default and restricts to INBOX/PRIMARY.
+        If `since_iso` is provided (ISO8601 string), it will add an `after:YYYY/MM/DD` term to the query.
+        """
         params = {}
+
+        # Build a conservative default query: inbox and exclude noisy categories
+        base_filters = ["in:inbox", "-category:promotions", "-category:forums", "-category:social"]
+        parts = base_filters.copy()
         if query:
-            params["q"] = query
+            parts.append(f"({query})")
+
+        # Add `after:` filter if last synced provided
+        if since_iso:
+            try:
+                from datetime import datetime as _dt
+
+                dt = _dt.fromisoformat(since_iso)
+                date_term = dt.strftime("%Y/%m/%d")
+                parts.append(f"after:{date_term}")
+            except Exception:
+                # ignore parse errors and continue without after:
+                pass
+
+        if parts:
+            params["q"] = " ".join(parts)
+
         if max_results:
             params["maxResults"] = max_results
 
         # If we have a history id we could use history.list but for simplicity list messages and filter by internalDate
         res = await self._make_request(user_id, "GET", f"/users/me/messages", params=params)
         if not res:
+            print(f"[GMAIL] list_messages_since: _make_request returned None for user {user_id}")
             return []
-        return res.get("messages", [])
+        messages = res.get("messages", [])
+        print(f"[GMAIL] list_messages_since: Found {len(messages)} messages for user {user_id}")
+        return messages
 
     async def get_message(self, user_id: str, message_id: str) -> Optional[Dict]:
         return await self._make_request(user_id, "GET", f"/users/me/messages/{message_id}", params={"format": "full"})

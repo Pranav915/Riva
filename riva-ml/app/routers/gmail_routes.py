@@ -60,12 +60,26 @@ async def oauth_callback(code: str = Query(None), state: str = Query(None), erro
         raise HTTPException(status_code=400, detail="Failed to connect Gmail")
 
 
+@router.post("/disconnect")
+async def disconnect_gmail(req: FetchRequest):
+    if not req.user_id:
+        raise HTTPException(status_code=400, detail="Missing user_id")
+    success = await _gmail_service.disconnect(req.user_id)
+    return {"success": success, "user_id": req.user_id}
+
+
 @router.post("/fetch")
 async def fetch_emails(req: FetchRequest):
     user_id = req.user_id
     if user_id:
-        result = await _email_processor.fetch_and_process(user_id)
-        return {"success": True, "result": result}
+        try:
+            print(f"[GMAIL_FETCH] Starting sync for user {user_id}")
+            result = await _email_processor.fetch_and_process(user_id)
+            print(f"[GMAIL_FETCH] Completed for user {user_id}: {result}")
+            return {"success": True, "result": result}
+        except Exception as e:
+            print(f"[GMAIL_FETCH] Error for user {user_id}: {e}")
+            raise HTTPException(status_code=500, detail=f"Fetch failed: {str(e)}")
     else:
         # In absence of user_id, trigger for all users with tokens (limited safety)
         cursor = gmail_tokens_collection.find({})
