@@ -15,6 +15,7 @@ Import this wherever you need consistent RIVA behavior.
 """
 from datetime import datetime
 from typing import Dict, List, Any, Optional
+from models.user.persona_models import UserPersona
 
 
 # ---------------------------------------------------------------------------
@@ -244,16 +245,19 @@ def build_riva_system_prompt(
     memory: Dict = None,
     time_ctx: Dict = None,
     extra_skills: List[str] = None,
+    persona: UserPersona = None,
+    behavior_rules_text: str = None,
 ) -> str:
     """
     Build a complete RIVA system prompt for any agent or call.
 
     Args:
         mode: "conversation" | "planning" | "financial" | "coaching"
-        memory: user memory dict from MemoryService
+        memory: user memory dict from MemoryService (Legacy/Fallback)
         time_ctx: result of get_time_context()
         extra_skills: list of skill block names to inject
-                      ("gtd", "time_blocking", "energy", "habits", "wellness", "finance")
+        persona: Synthesized UserPersona (Legacy — use behavior_rules_text instead)
+        behavior_rules_text: Pre-formatted behavior rules from PersonaBehaviorMapper (V2 primary)
     """
     if time_ctx is None:
         time_ctx = get_time_context()
@@ -268,8 +272,30 @@ CURRENT CONTEXT:
 - Time of day: {time_ctx['period']} (user energy likely {time_ctx['energy_level']})
 """.strip())
 
-    # --- User memory ---
-    if memory:
+    # --- V2 Behavior Rules (Primary — from PersonaBehaviorMapper) ---
+    if behavior_rules_text:
+        sections.append(behavior_rules_text)
+
+    # --- V1 Synthesized Persona Profile (Fallback) ---
+    elif persona:
+        persona_parts = ["SYNTHESIZED USER PERSONA:"]
+        persona_parts.append(f"- Communication Style: {persona.communication_style.verbosity}, {persona.communication_style.tone}")
+        
+        if persona.active_goals:
+            goals_str = ", ".join(
+                g.goal if hasattr(g, "goal") else str(g) for g in persona.active_goals
+            )
+            persona_parts.append(f"- Active Goals: {goals_str}")
+            
+        persona_parts.append(f"- Productivity Profile: {persona.productivity_profile.chronotype.replace('_', ' ').title()}")
+        persona_parts.append(f"- Peak Focus Hours: {', '.join(persona.productivity_profile.peak_focus_hours) if persona.productivity_profile.peak_focus_hours else 'Unknown'}")
+        
+        persona_parts.append(f"- Financial Persona: {persona.financial_persona.spending_style.replace('_', ' ').title()} spender")
+        
+        sections.append("\n".join(persona_parts))
+        
+    # --- Raw User Memory (Legacy Fallback) ---
+    elif memory:
         mem_parts = []
         if memory.get("facts"):
             mem_parts.append("Known facts about this user:")
@@ -290,7 +316,7 @@ CURRENT CONTEXT:
             for c in memory["constraints"]:
                 mem_parts.append(f"  • {c['key']}: {c['value']}")
         if mem_parts:
-            sections.append("USER PROFILE:\n" + "\n".join(mem_parts))
+            sections.append("USER PROFILE (RAW):\n" + "\n".join(mem_parts))
 
     # --- Skill injections ---
     skill_map = {

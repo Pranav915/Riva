@@ -100,7 +100,7 @@ class OpenAILLMProvider(LLMProvider):
                 model=kwargs.get("model", self._model),
                 messages=messages,
                 temperature=kwargs.get("temperature", 0.3),
-                max_tokens=kwargs.get("max_tokens", 100),
+                max_tokens=kwargs.get("max_tokens", 1000),
                 response_format=response_format,
             )
             return response.choices[0].message.parsed

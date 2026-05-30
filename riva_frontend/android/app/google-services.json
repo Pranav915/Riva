@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1077052251139",
+    "project_id": "riva-33210",
+    "storage_bucket": "riva-33210.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1077052251139:android:87df478721efb3678b4236",
+        "android_client_info": {
+          "package_name": "com.example.riva_frontend"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1077052251139-9emt79db5nit76m5q2ttshttfsnqqgb4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.riva_frontend",
+            "certificate_hash": "b266ee7ae7842fcf7407f9a0c70c13169f2b4e90"
+          }
+        },
+        {
+          "client_id": "1077052251139-bto0s984ribq95jooq3fldcq40g3fd1e.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAHV41uOJ_rMsPo-fv-qtvy9AfiLE9abvk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1077052251139-bto0s984ribq95jooq3fldcq40g3fd1e.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

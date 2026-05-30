@@ -9,10 +9,13 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
 
+import certifi
+
 load_dotenv()
 
 # Initialize MongoDB Client
-client = AsyncIOMotorClient(os.getenv("MONGO_URI"))
+uri = os.getenv("MONGO_URI")
+client = AsyncIOMotorClient(uri, tlsCAFile=certifi.where())
 db = client["riva"]
 
 # ----------------------------
@@ -27,12 +30,17 @@ financial_goals_collection = db["financial_goals"]
 user_memory_collection = db["user_memory"]          # Facts, preferences, habits
 conversation_summary_collection = db["conversation_summary"]  # Compressed chat history
 action_log_collection = db["action_log"]            # Audit trail
+user_persona_collection = db["user_persona"]        # High-level synthesized persona
+persona_observations_collection = db["persona_observations"] # Low-level behavioral signals
 
 # Calendar System Collections
 calendar_tokens_collection = db["calendar_tokens"]   # Per-user Google OAuth tokens
 
 # To-Do System Collections
 todos_collection = db["todos"]                        # Date-wise to-do items
+
+# Persona Engine V2 Collections
+episodic_context_collection = db["episodic_context"]  # Temporary situational context
 
 
 # ----------------------------

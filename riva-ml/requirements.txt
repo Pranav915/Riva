@@ -7,6 +7,7 @@ python-multipart==0.0.20
 # Database
 motor==3.7.0
 pymongo==4.12.1
+certifi
 redis==5.2.1
 
 # Auth & Security
@@ -22,11 +23,7 @@ openai==1.65.4
 google-api-python-client==2.163.0
 google-auth==2.38.0
 google-auth-oauthlib==1.2.1
-google-cloud-texttospeech==2.25.0
-
-# Speech Recognition
-SpeechRecognition==3.14.1
-vosk==0.3.45
+google-genai
 
 # Data Processing
 pydantic==2.10.6

@@ -12,14 +12,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import routers
-from routers import auth_router, user_router, stream_router, init_stt_provider, finance_router, calendar_router, todo_router, gemini_live_router
+from routers import auth_router, user_router, finance_router, calendar_router, todo_router, gemini_live_router
 
 # Lifespan manager for startup/shutdown
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("[INFO] Starting RIVA Backend...")
-    # Initialize STT provider
-    init_stt_provider()
     print("[OK] RIVA Backend ready")
     yield
     print("[INFO] Shutting down RIVA Backend...")
@@ -33,9 +31,10 @@ app = FastAPI(
 )
 
 # CORS Middleware
+cors_origins = os.getenv("CORS_ORIGINS", "*")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"] if cors_origins == "*" else [o.strip() for o in cors_origins.split(",")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,7 +46,6 @@ app.add_middleware(
 # Include routers
 app.include_router(auth_router)
 app.include_router(user_router)
-app.include_router(stream_router)
 app.include_router(finance_router)
 app.include_router(calendar_router)
 app.include_router(todo_router)
@@ -74,7 +72,9 @@ async def home():
 
 if __name__ == "__main__":
     import uvicorn
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8000"))
     print("[INFO] Starting RIVA Backend Server...")
-    print("[INFO] Server: http://0.0.0.0:8000")
-    print("[INFO] API Docs: http://0.0.0.0:8000/docs")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    print(f"[INFO] Server: http://{host}:{port}")
+    print(f"[INFO] API Docs: http://{host}:{port}/docs")
+    uvicorn.run(app, host=host, port=port)
