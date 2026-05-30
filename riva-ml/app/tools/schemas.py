@@ -204,6 +204,51 @@ TOOLS_SCHEMA = [
                     "required": ["todo_id"],
                 },
             },
+            # ── Memory / Persona ──────────────────────────────────────
+            {
+                "name": "save_user_memory",
+                "description": "Save a structured fact, preference, goal, or constraint about the user. Use this when the user explicitly states something about themselves that should be remembered long-term.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "memory_type": {
+                            "type": "STRING", 
+                            "description": "Type of memory: preference, habit, fact, constraint, goal."
+                        },
+                        "key": {
+                            "type": "STRING", 
+                            "description": "A concise snake_case identifier (e.g., 'meeting_time_preference', 'dietary_restriction')."
+                        },
+                        "value": {
+                            "type": "STRING", 
+                            "description": "The actual value or detail to remember (e.g., 'avoid_morning', 'vegetarian')."
+                        },
+                    },
+                    "required": ["memory_type", "key", "value"],
+                },
+            },
+            {
+                "name": "save_episodic_context",
+                "description": "Save a temporary life situation that should influence RIVA's behavior for a limited time. Use this when the user mentions something situational like interview prep, a stressful week, traveling, exams, a deadline, or a family event.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "context_type": {
+                            "type": "STRING",
+                            "description": "Category: career, health, travel, stress, deadline, family, study, general.",
+                        },
+                        "summary": {
+                            "type": "STRING",
+                            "description": "Brief description of the situation (e.g., 'Preparing for job interviews', 'Final exams next week').",
+                        },
+                        "duration_days": {
+                            "type": "NUMBER",
+                            "description": "How many days this context should stay active (default 7). Use 14-30 for longer situations.",
+                        },
+                    },
+                    "required": ["context_type", "summary"],
+                },
+            },
             {
                 "name": "end_conversation",
                 "description": "Call this when the user says bye, goodbye, or clearly wants to end the session.",

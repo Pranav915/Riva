@@ -31,8 +31,16 @@ from services.db import (
     transactions_collection,
     calendar_tokens_collection,
     todos_collection,
-    budgets_collection
+    budgets_collection,
+    user_persona_collection,
+    persona_observations_collection,
+    episodic_context_collection
 )
+from services.persona.persona_service import PersonaService
+from services.persona.memory_service import MemoryService
+from services.persona.observation_service import ObservationService
+from services.persona.episodic_context_service import EpisodicContextService
+from services.persona.persona_behavior_mapper import map_persona_to_behavior_rules, format_behavior_rules_for_prompt
 
 router = APIRouter(tags=["Gemini Live"])
 
@@ -46,7 +54,8 @@ async def get_tools_and_handlers(user_id: str):
         "user_memory": user_memory_collection,
         "calendar_tokens": calendar_tokens_collection,
         "todos": todos_collection,
-        "budgets": budgets_collection
+        "budgets": budgets_collection,
+        "episodic_context": episodic_context_collection
     }
     handle_tool_call = get_tool_handler(user_id, collections)
     return TOOLS_SCHEMA, handle_tool_call
@@ -56,7 +65,7 @@ async def get_tools_and_handlers(user_id: str):
 # System prompt builder for Gemini Live
 # Sent ONCE per session (connection time) — zero per-turn token cost.
 # ---------------------------------------------------------------------------
-def _build_gemini_system_prompt(schedule_ctx_text: str = "") -> str:
+def _build_gemini_system_prompt(schedule_ctx_text: str = "", persona=None, behavior_rules_text: str = None) -> str:
     """
     Build the Gemini Live system_instruction by composing:
       1. RIVA Brain persona + current time context + productivity skills
@@ -64,8 +73,6 @@ def _build_gemini_system_prompt(schedule_ctx_text: str = "") -> str:
       3. Optional live schedule context
 
     The result is sent once at session start — not on every turn.
-    Prompt length: ~1,200 tokens (was ~350). Cost impact: negligible because
-    Gemini Live caches the system_instruction across the session.
     """
     time_ctx = get_time_context()
 
@@ -74,6 +81,8 @@ def _build_gemini_system_prompt(schedule_ctx_text: str = "") -> str:
         mode="planning",
         time_ctx=time_ctx,
         extra_skills=["finance", "wellness", "habits"],
+        persona=persona,
+        behavior_rules_text=behavior_rules_text,
     )
 
     # Gemini Live-specific rules (tool usage, timezone, voice style)
@@ -106,6 +115,16 @@ BUDGET TOOLS:
 - get_budget_status → shows this month's spending vs limits. Call proactively after any large expense.
 - set_budget → sets a monthly limit for a category. E.g. user says "set food budget to 8000".
 - After recording an expense: if that category is at warning/over, mention it in one sentence.
+
+MEMORY MANAGEMENT (save_user_memory tool):
+- If the user explicitly states a strong preference (e.g. "I hate morning meetings"), habit, fact, or goal, call save_user_memory.
+- This ensures RIVA remembers it long-term. Do not repeat back that you saved it unless necessary.
+
+EPISODIC CONTEXT (save_episodic_context tool):
+- If the user mentions a temporary life situation (interview prep, stressful week, traveling, exams,
+  deadline, family event), call save_episodic_context.
+- This helps RIVA adapt behavior for that specific period.
+- Do not repeat back that you saved it unless asked.
 
 TOOL BEHAVIOUR:
 - For write operations: confirm in ONE short sentence. Never repeat back all the details.
@@ -174,6 +193,30 @@ async def gemini_live_endpoint(websocket: WebSocket):
     except Exception as e:
         print(f"[GEMINI_LIVE] Schedule context build error: {e}")
 
+    # Fetch User Persona & build behavior rules (V2 pipeline)
+    behavior_rules_text = None
+    user_persona = None
+    try:
+        mem_service = MemoryService(user_memory_collection)
+        obs_service = ObservationService(persona_observations_collection)
+        persona_service = PersonaService(user_persona_collection, mem_service, obs_service)
+        user_persona = await persona_service.get_persona(user_id)
+        
+        # Fetch active episodic contexts
+        episodic_svc = EpisodicContextService(episodic_context_collection)
+        episodic_contexts = await episodic_svc.get_active_contexts(user_id)
+        
+        # Run the behavior mapper
+        rules = map_persona_to_behavior_rules(user_persona, episodic_contexts)
+        behavior_rules_text = format_behavior_rules_for_prompt(rules)
+        
+        if behavior_rules_text:
+            print(f"[GEMINI_LIVE] V2 behavior rules injected ({len(behavior_rules_text)} chars)")
+        else:
+            print("[GEMINI_LIVE] No behavior rules generated (using defaults)")
+    except Exception as e:
+        print(f"[GEMINI_LIVE] Persona/behavior fetch error: {e}")
+
     config = types.LiveConnectConfig(
         response_modalities=["AUDIO"],
         tools=tools,
@@ -185,6 +228,8 @@ async def gemini_live_endpoint(websocket: WebSocket):
         system_instruction=types.Content(
             parts=[types.Part(text=_build_gemini_system_prompt(
                 schedule_ctx_text=schedule_ctx_text,
+                persona=user_persona if not behavior_rules_text else None,
+                behavior_rules_text=behavior_rules_text,
             ))],
         ),
     )
